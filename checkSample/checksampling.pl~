@@ -1,0 +1,136 @@
+#!usr/bin/perl -w
+
+#********************************************************************
+# MSc Bioinformatics with Systems Biology 2015/16
+# 
+# Analysis of the VH/VL packing
+#
+# Author:       Irene del Hierro García
+# Script name:  checksampling.pl
+# Version:      V1.1
+# Date:         12/08/16
+#
+#********************************************************************
+#
+# Purpose
+# ========
+#       Calculate the standard deviation of each of the redundant groups in the  
+#       RedundantChothia_Angles.txt file applying three different group thresholds, i.e. the first
+#       threshold is 3 which means that the sd is only going to be obtained for groups with three or more 
+#       structures. 
+#       The thresholds applied are three, four and five.
+#       The output files obtained with this script are in tabular format so they can be accessed by an R
+#       script that is going to determine the distribution of the standard deviations obtained and therefore,
+#       the sampling of the groups.
+#
+#********************************************************************
+#
+# Assumptions
+# ===========
+#       1. The program requires an input file with a list of antibodies grouped by sequence.
+#       2. The antibodies of the group should be separated by commas in the first line and in the next line 
+#          their respective angles
+#       3. The results will be printed in screen if an output file is not specified.
+#       4. Changes in the location of the modules should be applied by updating the path un the "use lib" statement
+#
+#       Usage: perl checksampling.pl < ../RedundantChothia_AllAngles.txt
+#
+#********************************************************************   
+# Strategy
+# ========
+#       1. Open and read each line of the input file.
+#       2. Compute the group size thresholds
+#       3. Calculate the sd
+#       4. Create an output tabular file for each threshold
+#
+#********************************************************************           
+#
+# Revision history
+# ================ 
+#       V1.0:   Original
+#       V1.1:   Comments
+#
+#********************************************************************
+
+use lib "/home/irene/Documents/MScProject/Modules";     #location of the modules (if not want to use just comment it).
+
+
+
+# Simply call: perl checksampling.pl < RedundantChothia_Angles.txt
+
+use strict;
+use packingAngle;       # Package that contains the subroutines for all the angle analysis
+use sd;	                # Package that contains the subroutines for the sd calculation
+
+# The counters are going to be the groups number 
+# The "x" arrays are going to store the group numbers and the "y" arrays are going to store the sd values
+my $count3=0;
+my @xValues3=(); my @yValues3=();
+my $name3 = "sd_valuesThres_3"; my $three = 3;
+
+my $count4=0;
+my @xValues4=(); my @yValues4=();
+my $name4 = "sd_valuesThres_4"; my $four = 4;
+
+my $count5=0;
+my @xValues5=(); my @yValues5=();
+my $name5 = "sd_valuesThres_5"; my $five = 5;
+
+while (my $line = <>)
+{
+        # Check if the line is empty
+        unless($line =~ /^$/)
+        {
+
+                chomp $line;
+        
+                # Skip the line to get the line with the angle values
+                $line =<>;
+
+                my @angles=();
+                # Get the values of the angles of a single redundant group
+                @angles = ($line =~ /(\d+\.?\d*)/g);
+        
+                # Call a subroutine that is going to set the threshold for each group
+                # In this case, for the threshold of three groups
+                # If the output is 1, then the redundant group fits the threshold, if 0, it doesn't.
+                my $check3= packingAngle::Threshold($three,\@angles);
+        
+                # Add the sd values if the group fits the thereshold
+                if($check3 == 1)
+                {
+            	        $count3++;
+                        # Call subroutine to retrieve the standard deviation and print the mean and sd in the output file
+                        my $sd3 = packingAngle::CallSDCalculator(\@angles);
+                        push @xValues3,$count3;
+                        push @yValues3,$sd3;
+                }
+	
+                my $check4= packingAngle::Threshold($four,\@angles);
+	
+                if($check4 == 1)
+                {
+        	        $count4++;
+           	        my $sd4 = packingAngle::CallSDCalculator(\@angles);
+                        push @xValues4,$count4;
+                        push @yValues4,$sd4;
+                }
+
+                my $check5= packingAngle::Threshold($five,\@angles);
+	
+                if($check5 == 1)
+                {
+        	        $count5++;
+                        my $sd5 = packingAngle::CallSDCalculator(\@angles);
+                        push @xValues5,$count5;
+                        push @yValues5,$sd5;
+                }
+        }
+}
+
+# Calling to subroutines to print the three tabular output files
+packingAngle::PrintFileToDistro(\@xValues3,\@yValues3,$name3);
+packingAngle::PrintFileToDistro(\@xValues4,\@yValues4,$name4);
+packingAngle::PrintFileToDistro(\@xValues5,\@yValues5,$name5);
+	
+exit;

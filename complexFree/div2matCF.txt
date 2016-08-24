@@ -1,0 +1,3 @@
+SD	F	C	F/C
+Low	216	251	110
+High	8	2	5
