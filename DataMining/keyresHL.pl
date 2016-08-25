@@ -13,7 +13,7 @@
 #
 # Purpose
 # =======
-#        Create a CSV file with the counts of the amino acids and a class output dependent on the sd.
+#        Create a CSV file with the counts of the amino acids and a class output dependent on the sd (input 1).
 #
 #********************************************************************
 #

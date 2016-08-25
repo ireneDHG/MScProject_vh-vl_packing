@@ -13,7 +13,7 @@
 #
 # Purpose
 # =======
-#        Create a CSV file with the residues in the key determing positions and a numeric output.
+#        Create a CSV file with the residues in the key determing positions and a numeric output (input 4).
 #
 #********************************************************************
 #

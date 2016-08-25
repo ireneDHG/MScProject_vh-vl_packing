@@ -13,7 +13,7 @@
 #
 # Purpose
 # =======
-#        Create a CSV file with the counts of the amino acids and a numeric output.
+#        Create a CSV file with the counts of the amino acids and a numeric output (input 1).
 #
 #********************************************************************
 #

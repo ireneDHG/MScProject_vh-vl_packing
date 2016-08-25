@@ -13,7 +13,7 @@
 #
 # Purpose
 # =======
-#        Create a CSV file with the residues in the relevant key determing positions and a nominal class output.
+#        Create a CSV file with the residues in the relevant key determing positions and a nominal class output (input 3).
 #
 #********************************************************************
 #
