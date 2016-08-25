@@ -13,7 +13,7 @@ Supervisor: Dr. Andrew C.R. Martin
 Description: 
 
 All the code used in this project is stored in this repository. The code kept here is in PERL and R languages.
-The output of this scripts are also available either in txt format.
+The output of these scripts is also available in txt format.
 
 
 
