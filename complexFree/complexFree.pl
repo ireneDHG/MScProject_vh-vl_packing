@@ -57,7 +57,7 @@ use CFtest;
 use packingAngle;
 
 # Open the output file for the tabular format
-open(TAB,">CFdistro.txt") or die "Unable to open the tabular output file\n";
+open(my $TAB,">CFdistro.txt") or die "Unable to open the tabular output file\n";
 
 # Get the directory of the input folder
 my $dir;
@@ -71,73 +71,97 @@ opendir (DIR, $dir) or die "Unable to open dir $dir\n";
 my @pdbFiles = grep(/.*\.pdb$/,readdir(DIR));
 closedir(DIR);
 
-my $id = 0; my %hashCF=();
+# Classify the groups and print the results
+&PrintCFOutputs($TAB);
 
-print TAB "SET\tSD\n";
+close($TAB);
 
-# For each line of the input file,
-# get the names of the antibodies and the standard deviation
-while(my $line = <>)
+
+#********************************************************************
+# Purpose: Classify redundant groups into free, mixed or complex
+#
+# Arguments:
+#       string $_[0]: file open variable 
+#       input file
+#
+# Requirements:
+#       1. Precise 1 argument
+#       2. $_[0] should be an handle file variable
+#       the input file should be introduced in the terminal
+#
+# Return:
+#       print the output in tabular format and in screen by default
+#
+#********************************************************************
+sub PrintCFOutputs
 {
-        chomp $line;
+        my ($TAB)=@_;
 
-        my @names = ($line =~ /(\d.{3}\_?\d*)/g);
-        $id++;
+        my $id = 0; my %hashCF=();
+
+        print $TAB "SET\tSD\n";
+
+        while(my $line = <>)
+        {
+                chomp $line;
+
+                my @names = ($line =~ /(\d.{3}\_?\d*)/g);
+                $id++;
 	
-        # Skip line to get the sd
-        $line = <>; 
-        my $sd = CFtest::GetSDFromFile($line);
+                # Skip line to get the sd
+                $line = <>; 
+                my $sd = CFtest::GetSDFromFile($line);
 	
-        # Avoid those groups with undefined sd
-        unless($sd eq "undef")
-        {	
-                my $complex=0; my $free =0;
+                # Avoid those groups with undefined sd
+                unless($sd eq "undef")
+                {	
+                        my $complex=0; my $free =0;
                 
-                foreach my $str (@names)
-                {
-                        # For each antibody in the group, check its pdb file
-                        foreach my $name (@pdbFiles)
+                        foreach my $str (@names)
                         {
-                                # Get the name of the file. If it is the same, look for complexity
-                                my $pdb = packingAngle::GetPdbFileName($name);
-                                if($str eq $pdb)
+                                # For each antibody in the group, check its pdb file
+                                foreach my $name (@pdbFiles)
                                 {
-                                        # Update the counters depending on the outcome (above 2 means complexed)
-                                        my $number = CFtest::AssignCF($name);
-                                        if ($number > 2)
+                                        # Get the name of the file. If it is the same, look for complexity
+                                        my $pdb = packingAngle::GetPdbFileName($name);
+                                        if($str eq $pdb)
                                         {
-                                                $complex++;
-                                        }
-                                        else
-                                        {
-                                                $free++;
-                                        }
+                                                # Update the counters depending on the outcome (above 2 means complexed)
+                                                my $number = CFtest::AssignCF($name);
+                                                if ($number > 2)
+                                                {
+                                                        $complex++;
+                                                }
+                                                else
+                                                {
+                                                        $free++;
+                                                }
+                                        }       
                                 }
                         }
-                }
-	        # Once all antibodies of the group have been analysed, check the class of the group
-                my $value = CFtest::CheckCFGroup($complex,$free);
+	                # Once all antibodies of the group have been analysed, check the class of the group
+                        my $value = CFtest::CheckCFGroup($complex,$free);
 	
-                # Assign a class depending on the outcome
-                if($value == 1)
-                {
-                        print TAB"Free\t$sd\n";
-                        print "Free set\n";
+                        # Assign a class depending on the outcome
+                        if($value == 1)
+                        {
+                                print $TAB "Free\t$sd\n";
+                                print "Free set\n";
+                        }
+                        elsif($value == 2)
+                        {
+                                print $TAB "Complex\t$sd\n";
+                                print "Complex set\n";
+                        }
+                        elsif($value == 3)
+                        {
+                                print $TAB "Mixed\t$sd\n";
+                                print "Mixed set\n";
+                        }
+                        print "$sd\n";
                 }
-                elsif($value == 2)
-                {
-                        print TAB "Complex\t$sd\n";
-                        print "Complex set\n";
-                }
-                elsif($value == 3)
-                {
-                        print TAB "Mixed\t$sd\n";
-                        print "Mixed set\n";
-                }
-                print "$sd\n";
         }
 }
 
-close(TAB);
 
 exit;

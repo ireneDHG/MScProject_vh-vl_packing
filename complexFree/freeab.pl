@@ -67,61 +67,81 @@ opendir (DIR, $dir) or die "Unable to open dir $dir\n";
 my @pdbFiles = grep(/.*\.pdb$/,readdir(DIR));
 closedir(DIR);
 
-my $id = 0; my %hashCF=();
+# Classify the groups and print the results
+&PrintCFOutputs;
 
-# For each line of the input file,
-# get the names of the antibodies, the sd and the mean
-while(my $line = <>)
+#********************************************************************
+# Purpose: Classify redundant groups into free and print the results
+#
+# Arguments:
+#       input file 
+#
+# Requirements:
+#       1. Precise 1 argument
+#       2. $_[0] should be a file introduced in the terminal
+#
+# Return:
+#       print the output in tabular format and in screen by default
+#
+#********************************************************************
+sub PrintCFOutputs
 {
-        chomp $line;
 
-        my @names = ($line =~ /(\d.{3}\_?\d*)/g);
-        $id++;
+        my $id = 0; my %hashCF=();
+
+        while(my $line = <>)
+        {
+                chomp $line;
+
+                my @names = ($line =~ /(\d.{3}\_?\d*)/g);
+                $id++;
 	
-        # Skip line to get the sd and mean
-        $line = <>; 
-        my $sd = CFtest::GetSDFromFile($line);
-        my $mean = CFtest::GetMeanFromFile($line);
+                # Skip line to get the sd
+                $line = <>; 
+                my $sd = CFtest::GetSDFromFile($line);
+                my $mean = CFtest::GetMeanFromFile($line);
 	
-        # Avoid those groups with undefined sd
-        unless($sd eq "undef")
-        {	
-                my $complex=0; my $free =0;
-                foreach my $str (@names)
-                {
-                        foreach my $name (@pdbFiles)
+                # Avoid those groups with undefined sd
+                unless($sd eq "undef")
+                {	
+                        my $complex=0; my $free =0;
+                
+                        foreach my $str (@names)
                         {
                                 # For each antibody in the group, check its pdb file
-                                # Get the name of the file. If it is the same, look for complexity
-                                my $pdb = packingAngle::GetPdbFileName($name);
-                                if($str eq $pdb)
+                                foreach my $name (@pdbFiles)
                                 {
-                                        # Update the counters depending on the outcome (above 2 means complexed)
-                                        my $number = CFtest::AssignCF($name);
-                                        if ($number > 2)
+                                        # Get the name of the file. If it is the same, look for complexity
+                                        my $pdb = packingAngle::GetPdbFileName($name);
+                                        if($str eq $pdb)
                                         {
-                                                $complex++;
-                                        }
-                                        else
-                                        {
-                                                $free++;
-                                        }
+                                                # Update the counters depending on the outcome (above 2 means complexed)
+                                                my $number = CFtest::AssignCF($name);
+                                                if ($number > 2)
+                                                {
+                                                        $complex++;
+                                                }
+                                                else
+                                                {
+                                                        $free++;
+                                                }
+                                        }       
                                 }
                         }
-                }
-	        # Once all antibodies of the group have been analysed, check the class of the group
-                my $value = CFtest::CheckCFGroup($complex,$free);
-	        # Assign a class depending on the outcome and print just the free redundant groups
-                if($value == 1)
-                {
-                        foreach my $elem (@names)
+	                # Once all antibodies of the group have been analysed, check the class of the group
+                        my $value = CFtest::CheckCFGroup($complex,$free);
+	
+                        # Assign a class depending on the outcome
+                        if($value == 1)
                         {
-                                print "$elem, ";
+                                foreach my $elem (@names)
+                                {
+                                        print "$elem, ";
+                                }
+                                print "\nSD: $sd MEAN: $mean\n";
                         }
-                        print "\nSD: $sd MEAN: $mean\n";
+                        
                 }
-
         }
 }
-
 exit;

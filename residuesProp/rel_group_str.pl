@@ -5,7 +5,7 @@
 # Analysis of the VH/VL packing
 #
 # Author:       Irene del Hierro García
-# Script name:  groups_structure.pl
+# Script name:  rel_group_str.pl
 # Version:      V1.1
 # Date:         19/08/16
 #
@@ -25,7 +25,7 @@
 #       3. The results will be printed in screen if an output file is not specified.
 #       4. Change the sd split if necessary and the names of the output files
 #
-#       Usage: perl groups_structure.pl < ../freeabSD.txt
+#       Usage: perl rel_group_str.pl < ../freeabSD.txt
 #
 #********************************************************************   
 # Strategy
@@ -64,161 +64,173 @@ opendir (DIR, $dir) or die "Unable to open dir $dir\n";
 my @pdbFiles = grep(/.*\.pdb$/,readdir(DIR));
 closedir(DIR);
 
-my %lowSD =();
-my %highSD = ();
+# Define the sd split:
+my $H = 5;      # High sd set
+my $L = 2;      # Low sd set
 
-# For each line of the file, get the names of the proteins and the sd
-while (my $line =<>)
-{
-        chomp $line;
-        
-        my @names = ($line =~ /(\d.{3}\_?\d*)/g);
-        
-        $line = <>;
-        
-        if($line =~ /^SD:\s(.+)\sMEAN:.*$/)
-        {
-                # unless the sd is undefined, add to the high or low sd set
-                unless($1=~ /undef/)
-                {
-                        if(5 < $1)
-                        {
-                                $highSD{$names[0]}=$1;
-                        }
-                        elsif(2 > $1)
-                        {
-                                $lowSD{$names[0]}=$1;
-                        }                
-                }
-        }
-}
+my ($ref1,$ref2) = &CreateLowHighHashes($H,$L);
 
+# Define the names of the output files
 my $lowset="rel_Str_L4";
 my $highset = "rel_Str_H4";
 
-open(my $LOW,">$lowset.txt") or die "Unable to open the file low $!\n";
-open(my $HIGH,">$highset.txt") or die "Unable to open the file high $!\n";
+# Create the low SD file
+&GetResiduesAndPrint($lowset,$ref1);
+# Create the high SD file
+&GetResiduesAndPrint($highset,$ref2);
 
-my %low_residues = ();
-my %positions = ();
 
-# For each of the proteins in the low set, open its PDB file and get the residues of the interface
-foreach my $name (keys %lowSD)
+#********************************************************************
+# Purpose: Classify the groups in a low sd hash and a high sd hash
+#
+# Arguments:
+#       string $_[0]: high threshold value
+#       string $_[1]: low threshold value
+#       input file introduced in terminal 
+#
+# Requirements:
+#       1. Precise 2 arguments
+#       2. $_[0] should be a number and non empty
+#       3. $_[0] should be a number and non empty
+#
+# Return:
+#       a reference to a low sd hash and a reference to a high sd hash
+#
+# Give error message if thresholds introduced are empty or non digit
+#********************************************************************
+sub CreateLowHighHashes
 {
-        foreach my $file (@pdbFiles)
-        {
-                my $pdb = packingAngle::GetPdbFileName($file);
-                if($name eq $pdb)
-                {
+        my ($h,$l) = @_;
 
-                        my $sd=$lowSD{$name};
-                        my $hashref = ResiduesProp::GetAaRelevantVHVLCode($file);
-                        my %hash = %$hashref;
-                        my %res = ();
-                        # From the hash, take the position i.e., L38 and the residue type
-                        foreach my $key (keys %hash)
-                        {
-                                my $relPos = "";
-                                my $aa = @{$hash{$key}}[0];
-                                my $chain = @{$hash{$key}}[1];
-                                my $pos = @{$hash{$key}}[2];
-                                $relPos = $chain . $pos;
-                                $res{$relPos} = $aa;
-                                $positions{$pos} = $chain;
-                        }
-                        $low_residues{$name} = \%res;
-                }
+        if($h eq "" or $l eq "")
+        {
+                die "H and L thresholds are empty\n";
         }
-}
-
-print $LOW "PDB";
-my @values = ();
-foreach my $key (keys %positions)
-{
-        my $val = $positions{$key} . $key;
-        push @values, $val;
-        print $LOW "\t$val";
-}
-print $LOW "\n";
-
-my $number = scalar @values;
-
-foreach my $key (keys %low_residues)
-{
-        print $LOW "$key";
-        for(my $i=0;$i<$number;$i++)
+        unless($h =~ /\d+/ or $l =~ /\d+/)      
         {
-                foreach my $key2 (keys %{$low_residues{$key}})
-                {
-                        if($values[$i] eq $key2)
-                        {
-                                print $LOW "\t$low_residues{$key}{$key2}";
-                        }
-                }
+                die "H and L thresholds are not numeric\n";
         }
-        print $LOW "\n";
-}
-                       
-my %high_residues = ();
 
-# Do the same but with the high sd set
+        my %lowSD =();
+        my %highSD = ();
 
-foreach my $name (keys %highSD)
-{
-        foreach my $file (@pdbFiles)
+        # For each line of the file, get the names of the proteins and the sd
+        while (my $line =<>)
         {
-                my $pdb = packingAngle::GetPdbFileName($file);
-                if($name eq $pdb)
+                chomp $line;
+        
+                my @names = ($line =~ /(\d.{3}\_?\d*)/g);
+        
+                $line = <>;
+        
+                if($line =~ /^SD:\s(.+)\sMEAN:.*$/)
                 {
-                        #print "$pdb\n";
-
-                        my $sd=$highSD{$name};
-                        my $hashref = ResiduesProp::GetAaRelevantVHVLCode($file);
-                        my %hash = %$hashref;
-                        my %res = ();
-
-                        foreach my $key (keys %hash)
+                        # unless the sd is undefined, add to the high or low sd set
+                        unless($1=~ /undef/)
                         {
-                                my $relPos = "";
-                                my $aa = @{$hash{$key}}[0];
-                                my $chain = @{$hash{$key}}[1];
-                                my $pos = @{$hash{$key}}[2];
-                                $relPos = $chain . $pos;
-                                $res{$relPos} = $aa;
-                                #print "$relPos $aa\n";
-                                #$high_rel_positions{$pos} = $chain;
-                        }
-                        $high_residues{$name} = \%res;
-                }
-        }
-}
-
-print $HIGH "PDB";
-foreach my $a (@values)
-{
-        print $HIGH "\t$a";
-}
-
-print $HIGH "\n";
-
-foreach my $key (keys %high_residues)
-{
-        print $HIGH "$key";
-        for(my $i=0;$i<$number;$i++)
-        {
-                foreach my $key2 (keys %{$high_residues{$key}})
-                {
-                        if($values[$i] eq $key2)
-                        {
-                                print $HIGH "\t$high_residues{$key}{$key2}";
+                                if($h < $1)
+                                {
+                                        $highSD{$names[0]}=$1;
+                                }
+                                elsif($l > $1)
+                                {
+                                        $lowSD{$names[0]}=$1;
+                                }                
                         }
                 }
         }
-        print $HIGH "\n";
+        return(\%lowSD,\%highSD);
 }
-                 
 
-close($LOW);
-close($HIGH);
+#********************************************************************
+# Purpose: Get the relevant residues from a hash reference and print in an output file
+#
+# Arguments:
+#       string $_[0]: name of the output file
+#       string $_[1]: hash reference
+#
+# Requirements:
+#       1. Precise 2 arguments
+#       2. $_[0] should be non empty
+#       3. $_[0] should be non empty
+#
+# Return:
+#       an output file
+#
+# Give error message if thresholds introduced are empty or non digit
+#********************************************************************
+sub GetResiduesAndPrint
+{
+        my ($name, $ref) = @_;
+        my %setSD = %$ref;
+
+        if($name eq "" or $ref eq "")           
+        {
+                die "At least one of the arguments introduced in &GetResiduesAndPrint() is empty\n";
+        }
+        
+        open(OUT,">$name.txt") or die "Unable to open the file $name $!\n";
+
+        my %residues = (); my %positions = ();
+
+        # For each of the proteins in the set, open its PDB file and get the residues of the interface
+        foreach my $name (keys %setSD)
+        {
+                foreach my $file (@pdbFiles)
+                {
+                        my $pdb = packingAngle::GetPdbFileName($file);
+                        if($name eq $pdb)
+                        {
+
+                                my $sd=$setSD{$name};
+                                my $hashref = ResiduesProp::GetAaRelevantVHVLCode($file);
+                                my %hash = %$hashref;
+                                my %res = ();
+                                # From the hash, take the position i.e., L38 and the residue type
+                                foreach my $key (keys %hash)
+                                {
+                                        my $relPos = "";
+                                        my $aa = @{$hash{$key}}[0];
+                                        my $chain = @{$hash{$key}}[1];
+                                        my $pos = @{$hash{$key}}[2];
+                                        $relPos = $chain . $pos;
+                                        $res{$relPos} = $aa;
+                                        $positions{$pos} = $chain;
+                                }
+                                $residues{$name} = \%res;
+                        }
+                }
+        }
+
+        print OUT "PDB";
+        my @values = ();
+        foreach my $key (keys %positions)
+        {
+                my $val = $positions{$key} . $key;
+                push @values, $val;
+                print OUT "\t$val";
+        }
+        print OUT "\n";
+
+        my $number = scalar @values;
+
+        foreach my $key (keys %residues)
+        {
+                print OUT "$key";
+                for(my $i=0;$i<$number;$i++)
+                {
+                        foreach my $key2 (keys %{$residues{$key}})
+                        {
+                                if($values[$i] eq $key2)
+                                {
+                                        print OUT "\t$residues{$key}{$key2}";
+                                }
+                        }
+                }
+                print OUT "\n";
+        }
+        close(OUT);
+}
+
 
 exit;

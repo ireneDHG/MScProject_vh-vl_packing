@@ -5,7 +5,7 @@
 # Analysis of the VH/VL packing
 #
 # Author:       Irene del Hierro García
-# Script name:  analyzeAngles.pl
+# Script name:  analyseAngles.pl
 # Version:      V1.1
 # Date:         12/08/16
 #
@@ -28,7 +28,7 @@
 #          (change the location of the Modules folder to correctly used this program)
 #       4. Unless a screen printing is required, add an output file to obtain the results.
 #
-#       perl analyzeAngles.pl < ../RedundantChothia_Angles.txt > ../RedundantChothia_MeanSD.txt 
+#       perl analyseAngles.pl < ../RedundantChothia_Angles.txt > ../RedundantChothia_MeanSD.txt 
 #
 #********************************************************************   
 # Strategy
@@ -52,42 +52,74 @@ use strict;
 use sd;                 # Package to calculate standard deviation and mean
 use packingAngle;       # Package with the subroutines for this script
 
-my $count=0;    # The counter would be the group name for the R file
+# Get the x (group number) and y vectors (sd values)
+my ($xref,$yref) = &ProcessInputFile;
 
-my @xValues=(); # To store the redundant group number
-my @yValues=(); # To store the sd values
-
-while (my $line = <>)
-{
-        # Check if the line is empty
-        unless($line =~ /^$/)
-        {
-                chomp $line;
-        
-                # Print the line with the PDB names in the output file
-                print "$line\n";
-        
-                # Skip the line to get the line with the angle values
-                $line = <>;
-        
-                my @angles=();
-
-                # Get the values of the angles of a single redundant group
-                @angles = ($line =~ /(\d+\.?\d*)/g);
-                $count++;
-	
-                push @xValues, $count;
-      	
-                # Call subroutine to retrieve the standard deviation and print the mean and sd in the output file
-                my $sd = packingAngle::CallSDCalculator (\@angles);
-	
-                push @yValues, $sd;  
-        }      
-}
+my @xVal = @$xref;
+my @yVal = @$yref;
 
 # Call a subroutine that it is simply going to create a diferent file that can be analyzed by R
 my $nameOut = "sd_values";
-packingAngle::PrintFileToDistro(\@xValues,\@yValues,$nameOut);
+packingAngle::PrintFileToDistro(\@xVal,\@yVal,$nameOut);
+
+
+
+
+#********************************************************************
+# Purpose: Process the input file and retrieve a vector with the number of the groups
+#          and another vector with the values.
+#
+# Arguments:
+#       none: the input is the input file 
+#
+# Requirements:
+#       1. The file has to have specific format, i.e.:
+#       5DFV_1, 5DFV_2, 
+#       -48.838169, -45.589493, 
+#
+# Return:
+#       array references of the group numbers and values
+#
+# If any line is empty, skip it
+# If the file does not have that format, there is no guarantee of success
+#********************************************************************
+sub ProcessInputFile
+{
+        my $count=0;    # The counter would be the group name for the R file
+
+        my @xValues=(); # To store the redundant group number
+        my @yValues=(); # To store the sd values
+
+        while (my $line = <>)
+        {
+                # Check if the line is empty
+                unless($line =~ /^$/)
+                {
+                        chomp $line;
+        
+                        # Print the line with the PDB names in the output file
+                        print "$line\n";
+        
+                        # Skip the line to get the line with the angle values
+                        $line = <>;
+        
+                        my @angles=();
+
+                        # Get the values of the angles of a single redundant group
+                        @angles = ($line =~ /(\d+\.?\d*)/g);
+                        $count++;
+	
+                        push @xValues, $count;
+      	
+                        # Call subroutine to retrieve the standard deviation and print the mean and sd in the output file
+                        my $sd = packingAngle::CallSDCalculator (\@angles);
+	
+                        push @yValues, $sd;  
+                }      
+        }
+        return(\@xValues,\@yValues);
+}
+
 
 exit;      
         

@@ -52,36 +52,6 @@ use ResiduesProp;
 use packingAngle;
 use config;
 
-my %highSD=();
-my %lowSD=();
-
-# Create the two sets of standard deviations from the input file
-while(my $line = <>)
-{
-        chomp $line;
-
-        my @names = ($line =~ /(\d.{3}\_?\d*)/g);
-	
-        $line=<>;       
-        
-        # Extract the sd
-        if($line =~ /^SD:\s(.+)\sMEAN:.*$/)
-        {
-                # Avoid those groups with undefined sd
-                unless($1=~ /undef/){
-                        if(3 < $1)
-                        {
-                                $highSD{$names[0]}=$1;
-                        }
-                        elsif(1 > $1)
-                        {
-                                $lowSD{$names[0]}=$1;
-                        }
-                }
-        }
-}
-
-
 # Get the directory of the input folder
 my $dir;
 if(!defined($dir))
@@ -94,56 +64,138 @@ opendir (DIR, $dir) or die "Unable to open dir $dir\n";
 my @pdbFiles = grep(/.*\.pdb$/,readdir(DIR));
 closedir(DIR);
 
+# Define the sd split:
+my $H = 3;      # High sd set
+my $L = 1;      # Low sd set
 
-my $var="freediv1typeH";
-my $rVar="freeRdiv1typeH";
+my ($ref1,$ref2) = &CreateLowHighHashes($H,$L);
 
-open(my $FI1,">$var.txt") or die "Unable to open the file 1\n";
-open(my $R1,">$rVar.txt") or die "Unable to open the r file 1\n";
 
-print $R1 "PDB\tSD\tHydrophobic\tHydrophilic\tAmphipathic\tGlycines\n";
+# Set output file names for high set
+my $var="freediv1typeHp";
+my $rVar="freeRdiv1typeHp";
+&CalculateTypesPrint($var,$rVar,$ref2,\@pdbFiles);
 
-# For the high set of types, classify the relevant residues into types
-foreach my $name (keys %highSD)
+# Low set
+my $var2="freediv1typeLp";
+my $rVar2="freeRdiv1typeLp";
+&CalculateTypesPrint($var2,$rVar2,$ref1,\@pdbFiles);
+
+
+
+#********************************************************************
+# Purpose: Classify the groups in a low sd hash and a high sd hash
+#
+# Arguments:
+#       string $_[0]: high threshold value
+#       string $_[1]: low threshold value
+#       input file introduced in terminal 
+#
+# Requirements:
+#       1. Precise 2 arguments
+#       2. $_[0] should be a number and non empty
+#       3. $_[0] should be a number and non empty
+#
+# Return:
+#       a reference to a low sd hash and a reference to a high sd hash
+#
+# Give error message if thresholds introduced are empty or non digit
+#********************************************************************
+sub CreateLowHighHashes
 {
-        foreach my $file(@pdbFiles)
+        my ($h,$l) = @_;
+
+        if($h eq "" or $l eq "")
         {
-                my $pdb = packingAngle::GetPdbFileName($file);
-                if($name eq $pdb)
+                die "H and L thresholds are empty\n";
+        }
+        unless($h =~ /\d+/ or $l =~ /\d+/)      
+        {
+                die "H and L thresholds are not numeric\n";
+        }
+
+        my %lowSD =();
+        my %highSD = ();
+
+        # For each line of the file, get the names of the proteins and the sd
+        while (my $line =<>)
+        {
+                chomp $line;
+        
+                my @names = ($line =~ /(\d.{3}\_?\d*)/g);
+        
+                $line = <>;
+        
+                if($line =~ /^SD:\s(.+)\sMEAN:.*$/)
                 {
-                        my $sd=$highSD{$name};
-                        my $hashref = ResiduesProp::GetAaInterfaceVHVLCode($file);
-                        ResiduesProp::SetResidueType($hashref,$pdb,$FI1,$R1,$sd);
+                        # unless the sd is undefined, add to the high or low sd set
+                        unless($1=~ /undef/)
+                        {
+                                if($h < $1)
+                                {
+                                        $highSD{$names[0]}=$1;
+                                }
+                                elsif($l > $1)
+                                {
+                                        $lowSD{$names[0]}=$1;
+                                }                
+                        }
                 }
         }
+        return(\%lowSD,\%highSD);
 }
 
-my $var2="freediv1typeL";
-my $rVar2="freeRdiv1typeL";
-
-open(my $FI2,">$var2.txt") or die "Unable to open the file 2\n";
-open(my $R2,">$rVar2.txt") or die "Unable to open the r file 2\n";
-
-print $R2 "PDB\tSD\tHydrophobic\tHydrophilic\tAmphipathic\tGlycines\n";
-
-# For the low set of types, classify the relevant residues into types
-foreach my $name (keys %lowSD)
+#********************************************************************
+# Purpose: Classify the residues of a hash of arrays in types and print the results
+#
+# Arguments:
+#       string $_[0]: name of txt file
+#       string $_[1]: name of R file
+#       string $_[2]: reference to the hash of arrays
+#       string $_[3]: reference to an array of files 
+#
+# Requirements:
+#       1. Precise 4 arguments
+#       2. $_[0,1,2,3] should not be empty
+#
+# Return:
+#       two output files
+#
+# Error if one of the arguments introduced is empty
+#********************************************************************
+sub CalculateTypesPrint
 {
-        foreach my $file(@pdbFiles)
+        my ($name1, $name2,$ref,$files) = @_;
+
+        if($name1 eq "" or $name2 eq "" or $ref eq "" or $files eq "")
         {
-                my $pdb = packingAngle::GetPdbFileName($file);
-                if($name eq $pdb)
+                die "At least one of the arguments introduced in CalculateTypesPrint() is empty\n";
+        }
+
+        my %set = %$ref;
+        my @pdbFiles = @$files;
+
+        open(my $FI2,">$name1.txt") or die "Unable to open the file $name1\n";
+        open(my $R2,">$name2.txt") or die "Unable to open the r file $name2\n";
+
+        print $R2 "PDB\tSD\tHydrophobic\tHydrophilic\tAmphipathic\tGlycines\n";
+
+        # For the low set of types, classify the relevant residues into types
+        foreach my $name (keys %set)
+        {
+                foreach my $file(@pdbFiles)
                 {
-                        my $sd=$lowSD{$name};
-                        my $hashref = ResiduesProp::GetAaInterfaceVHVLCode($file);
-                        ResiduesProp::SetResidueType($hashref,$pdb,$FI2,$R2,$sd);
+                        my $pdb = packingAngle::GetPdbFileName($file);
+                        if($name eq $pdb)
+                        {
+                                my $sd=$set{$name};
+                                my $hashref = ResiduesProp::GetAaInterfaceVHVLCode($file);
+                                ResiduesProp::SetResidueType($hashref,$pdb,$FI2,$R2,$sd);
+                        }
                 }
         }
+        close($FI2);
+        close($R2);
 }
-
-close($FI1);
-close($FI2);
-close($R1);
-close($R2);
 
 exit;

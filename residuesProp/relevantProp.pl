@@ -47,40 +47,11 @@
 
 use lib "/home/irene/Documents/MScProject/Modules";     #location of the modules (if not want to use just comment it).
 
+
 use strict;
 use ResiduesProp;
 use packingAngle;
 use config;
-
-my %highSD=();
-my %lowSD=();
-
-# Create the two sets of standard deviations from the input file
-while(my $line = <>)
-{
-        chomp $line;
-
-        my @names = ($line =~ /(\d.{3}\_?\d*)/g);
-	
-        $line=<>;       
-        
-        # Extract the sd
-        if($line =~ /^SD:\s(.+)\sMEAN:.*$/)
-        {
-                # Avoid those groups with undefined sd
-                unless($1=~ /undef/){
-                        # Set the division set
-                        if(4 < $1)
-                        {
-                                push @{$highSD{$names[0]}},$1;
-                        }
-                        elsif(2 > $1)
-                        {
-                                push @{$lowSD{$names[0]}},$1;
-                        }
-                }
-        }
-}
 
 
 # Get the directory of the input folder
@@ -95,77 +66,179 @@ opendir (DIR, $dir) or die "Unable to open dir $dir\n";
 my @pdbFiles = grep(/.*\.pdb$/,readdir(DIR));
 closedir(DIR);
 
-# Calculate the properties for the high sd set
-foreach my $name (keys %highSD)
+# Define the sd split:
+my $H = 4;      # High sd set
+my $L = 1;      # Low sd set
+
+my ($ref1,$ref2) = &CreateLowHighHashes($H,$L);
+
+# For the Low SD set:
+my $nameL = "relevantL6";
+my $hashrefL = &CalculateProp($ref1,\@pdbFiles);
+&PrintProp($nameL,$hashrefL);
+
+#For the High SD set
+my $nameH = "relevantH6";
+my $hashrefH = &CalculateProp($ref2,\@pdbFiles);
+&PrintProp($nameH,$hashrefH);
+
+
+#********************************************************************
+# Purpose: Classify the groups in a low sd hash and a high sd hash
+#
+# Arguments:
+#       string $_[0]: high threshold value
+#       string $_[1]: low threshold value
+#       input file introduced in terminal 
+#
+# Requirements:
+#       1. Precise 2 arguments
+#       2. $_[0] should be a number and non empty
+#       3. $_[0] should be a number and non empty
+#
+# Return:
+#       a reference to a low sd hash and a reference to a high sd hash
+#
+# Give error message if thresholds introduced are empty or non digit
+#********************************************************************
+sub CreateLowHighHashes
 {
-        foreach my $file(@pdbFiles)
+        my ($h,$l) = @_;
+
+        if($h eq "" or $l eq "")
         {
-                # Get the name of the file
-                my $pdb = packingAngle::GetPdbFileName($file);
-                # If it is equal to the name of the high sd set
-                if($name eq $pdb)
+                die "H and L thresholds are empty\n";
+        }
+        unless($h =~ /\d+/ or $l =~ /\d+/)      
+        {
+                die "H and L thresholds are not numeric\n";
+        }
+
+        my %lowSD =();
+        my %highSD = ();
+
+        # For each line of the file, get the names of the proteins and the sd
+        while (my $line =<>)
+        {
+                chomp $line;
+        
+                my @names = ($line =~ /(\d.{3}\_?\d*)/g);
+        
+                $line = <>;
+        
+                if($line =~ /^SD:\s(.+)\sMEAN:.*$/)
                 {
-                        # Get the relevant key determining residues of the interface
-                        my $hashref = ResiduesProp::GetAaRelevantVHVLCode($file);
-                        # Calculate properties
-                        my $hydro = ResiduesProp::CalculateHydropAVG($hashref);
-                        my $mw = ResiduesProp::CalculateMW($hashref);
-                        my $pi = ResiduesProp::CalculatePIAVG($hashref);
-			# Add the results to the high sd hash
-                        push @{$highSD{$name}},$hydro,$mw,$pi;
+                        # unless the sd is undefined, add to the high or low sd set
+                        unless($1=~ /undef/)
+                        {
+                                if($h < $1)
+                                {
+                                        push @{$highSD{$names[0]}},$1;
+                                }
+                                elsif($l > $1)
+                                {
+                                        push @{$lowSD{$names[0]}},$1;
+                                }                
+                        }
                 }
         }
+        return(\%lowSD,\%highSD);
 }
 
-# Calculate the properties for the low sd set
-foreach my $name (keys %lowSD)
+#********************************************************************
+# Purpose: Calculate properties for the elements of a hash of arrays and
+#          add them to the hash
+#
+# Arguments:
+#       string $_[0]: reference to a hash of arrays
+#       string $_[1]: reference to an array 
+#
+# Requirements:
+#       1. Precise 2 arguments
+#       2. $_[0] should be a hash of arrays with the name of the PDB file as key and the sd as first and only value of the array
+#       3. $_[0] should be an array of PDB files
+#
+# Return:
+#       a reference to the hash of arrays updated
+#
+#********************************************************************
+sub CalculateProp
 {
-        foreach my $file(@pdbFiles)
+        my($ref1,$ref2) =@_;
+        
+        my %setSD = %$ref1;
+
+        my @pdbFiles = @$ref2;
+
+        # Calculate the properties for the high sd set
+        foreach my $name (keys %setSD)
         {
-                my $pdb = packingAngle::GetPdbFileName($file);
-                if($name eq $pdb)
+                foreach my $file(@pdbFiles)
                 {
-                        my $hashref = ResiduesProp::GetAaRelevantVHVLCode($file);
-                        my $hydro = ResiduesProp::CalculateHydropAVG($hashref);
-                        my $mw = ResiduesProp::CalculateMW($hashref);
-                        my $pi = ResiduesProp::CalculatePIAVG($hashref);
-                        
-                        push @{$lowSD{$name}},$hydro,$mw,$pi;
+                        # Get the name of the file
+                        my $pdb = packingAngle::GetPdbFileName($file);
+                        # If it is equal to the name of the high sd set
+                        if($name eq $pdb)
+                        {
+                                # Get the key determining residues of the interface
+                                my $hashref = ResiduesProp::GetAaRelevantVHVLCode($file);
+                                # Calculate properties
+                                my $hydro = ResiduesProp::CalculateHydropAVG($hashref);
+                                my $mw = ResiduesProp::CalculateMW($hashref);
+                                my $pi = ResiduesProp::CalculatePIAVG($hashref);
+			
+                                # Add the results to the high sd hash
+                                push @{$setSD{$name}},$hydro,$mw,$pi;
+                        }
                 }
         }
+        return(\%setSD);
 }
 
-# Change the names of these files if necessary
-
-open(OUT,">relevantH2.txt") or die "Unable to open the output file\n";
-
-print OUT "HIGHpdb\tSD\tHYDRO\tMW\tPI\n";
-
-foreach my $key (keys %highSD)
+#********************************************************************
+# Purpose: Print a hash of arrays in a file
+#
+# Arguments:
+#       string $_[0]: name of the file
+#       string $_[1]: reference to the hash
+#
+# Requirements:
+#       1. Precise 2 arguments
+#       2. $_[0] should be non empty
+#       3. $_[0] should be non empty
+#
+# Return:
+#       a reference to a low sd hash and a reference to a high sd hash
+#
+# Give error message if one of the arguments is empty
+#********************************************************************
+sub PrintProp
 {
-        print OUT "$key";
-        foreach my $elem (@{$highSD{$key}})
+        my($name, $ref) =@_;
+
+        if($name eq "" or $ref eq "")
         {
-                print OUT "\t$elem";
+                die "At least one of the arguments introduced in &PrintProp() is empty\n";
         }
-        print OUT "\n";
+
+        my %set = %$ref;
+
+        open(OUT,">$name.txt") or die "Unable to open the output $name file\n";
+
+        print OUT "HIGHpdb\tSD\tHYDRO\tMW\tPI\n";
+
+        foreach my $key (keys %set)
+        {
+                print OUT "$key";
+                foreach my $elem (@{$set{$key}})
+                {
+                        print OUT "\t$elem";
+                }
+                print OUT "\n";
+        }
+
+        close(OUT);
 }
 
-close(OUT);
-
-open(LOW,">relevantL2.txt") or die "Unable to open the output file\n";
-
-print LOW "LOWpdb\tSD\tHYDRO\tMW\tPI\n";
-
-foreach my $key (keys %lowSD)
-{
-        print LOW "$key";
-        foreach my $elem (@{$lowSD{$key}}){
-                print LOW "\t$elem";
-        }
-        print LOW "\n";
-}
-
-close(LOW);
 
 exit;

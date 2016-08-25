@@ -1,5 +1,6 @@
 ######################
 # Script name: graphSD.R
+# Author: Irene del Hierro
 # 
 # Requirements: 	4 txt input files in tabular format.
 #		    	Group number \t sd value

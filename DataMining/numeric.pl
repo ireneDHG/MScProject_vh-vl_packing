@@ -192,14 +192,14 @@ foreach my $key (keys %linear)
         }
 }
 
-# Calculate the inverse of the activation function to the total and add the threshold and denormalize
+# Add threshold and then calculate the inverse of the activation function
+$w += $linear{"Thres"};
 my $sigma = 1 / $w;
+
+# Denormalize
 my $a = ($sigma * ($max - $min))+ $min;
-$sigma += $linear{"Thres"};
+print "The prediction is: $a\n";
 
-my $final1 = ($sigma * ($max - $min))+ $min;
-
-print "The prediction is: $final1 $sigma\n";
 
 
 

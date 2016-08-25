@@ -183,10 +183,9 @@ foreach my $key (keys %linear)
                 }
         }
 }
-# Compute the inverse of the activation function to the total and add the threshold
-my $sigma = 1 / $w;
-print "no act $sigma\n";
-$sigma += $linear{"Thres"};
 
-print "The prediction is: $sigma\n";
+$w += $linear{"Thres"};
+my $sigma = 1 / $w;
+print "The prediction of sd is $sigma\n";
+
 
